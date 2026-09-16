@@ -17,7 +17,7 @@ margins    (500, 8)        one penalty per image per class
 .mean()        ()          a single number         <- everything collapses
 '''
 
-def svm_loss(W, X, y, reg=0.0):
+def svm_loss(W, X, y, reg=0.0) -> tuple[float, np.ndarray]:
   N = X.shape[0]
   rows = np.arange(N)
   scores = X @ W
@@ -29,13 +29,37 @@ def svm_loss(W, X, y, reg=0.0):
 
   losses = np.sum(margins, axis=1)
   data_loss = losses.mean()
-  reg_loss = reg * np.sum(W * W)
+  reg_loss = reg * np.sum(W * W) # Penalize large weights
   loss = data_loss + reg_loss
 
   g = (margins > 0).astype(float) # Matrix of 1's and 0's. Tells which way to push
   g[rows, y] = -g.sum(axis=1) # The correct class needs to win against all the other ones, so it gets pushed in the correct direction with a strength that equals the amount of close or winning contestants
   g /= N # The average is taken
   dW = X.T @ g + 2 * reg * W  
+
+  return loss, dW
+
+def softmax_loss(W, X, y, reg=0.0) -> tuple[float, np.ndarray]:
+  N = X.shape[0]
+  rows = np.arange(N)
+  scores = X @ W
+  scores_shifted = scores - np.max(scores) # for safety, for not reaching a bit overflow
+  correct = scores[rows, y][:, None]
+
+  exp_scores = np.exp(scores_shifted)
+  probs = exp_scores / np.sum(exp_scores)
+  correct_logprobs = -np.log(probs[rows, y])
+
+  losses = np.sum(correct_logprobs)
+  data_loss = losses.mean()
+  reg_loss = reg * np.sum(W * W)
+  loss = data_loss + reg_loss
+
+  gradient_scores = probs.copy()
+  gradient_scores[rows, y] -= 1 # The correct probabilities are negated by one to push their weights up
+  gradient_scores /= N
+
+  dW = X.T @ gradient_scores + (2 * reg * W) # apply the same logic as with SVM, include L2 regulation to penalize larger weights
 
   return loss, dW
 

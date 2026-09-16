@@ -114,4 +114,4 @@ num_classes = 8
 
 W = np.random.randn(image_size, num_classes) * 0.0001
 
-print(svm_loss.svm_loss(W, X_train, y_train))
+print(svm_loss.svm_loss(W, X_train, y_train, 1000)[1][0])
