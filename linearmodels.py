@@ -8,7 +8,7 @@ from functools import partial
 
 from medmnist import BloodMNIST
 
-import svm_loss
+import data_loss
 from knn import KNearestNeighbor
 
 trainDataset = BloodMNIST(split="train", download=True,size=28)
