@@ -11,7 +11,7 @@ class LinearClassifier:
         self.W = np.random.randn(input_dim, num_classes) * 0.01 
         self.loss_type = loss_type
 
-    def train(self, X, y, learning_rate=0.001, reg=0.00001, num_iters=1000, batch_size=200, verbose=True):
+    def train(self, X, y, learning_rate=0.001, reg=0.00001, num_iters=1000, batch_size=200):
         num_train = X.shape[0]
         loss_history = []
         
@@ -31,11 +31,6 @@ class LinearClassifier:
             
             # 3. Update weights using Gradient Descent
             self.W -= learning_rate * gradient
-
-            # 4. Optional progress tracking
-            if verbose and (it%100 == 0 or it == num_iters-1):
-                print(f"Iteration {it}/{num_iters}: loss {loss:.4f}")
-
         return loss_history        
     
     def predict(self, X: list[int]):

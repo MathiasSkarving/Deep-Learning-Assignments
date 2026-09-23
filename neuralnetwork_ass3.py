@@ -9,25 +9,61 @@ from functools import partial
 
 from medmnist import BloodMNIST
 
-import data_loss as dl
 from knn import KNearestNeighbor
 from linearclassifier import LinearClassifier
+from simple_neural_network import FullyConnectedNN
+
+def random_search(X_train, y_train, X_val, y_val, num_trials=20):
+    best_acc = 0
+    best_params = None
+    best_model = None
+
+    for trial in range(num_trials):
+        # Sample hyperparameters from a reasonable range (log scale for lr and reg!)
+        lr = 10 ** np.random.uniform(-5, -1)        # e.g. 1e-5 to 1e-1
+        reg = 10 ** np.random.uniform(-5, 1)         # e.g. 1e-5 to 1e1
+        hidden_size = np.random.choice([64, 128, 256, 512])
+        batch_size = np.random.choice([32, 64, 128])
+        optimizer = np.random.choice(['sgd', 'momentum', 'adam'])
+
+        layers = [X_train.shape[1], hidden_size, 8]  # adjust output size to your num_classes
+
+        model = FullyConnectedNN(layers=layers, reg_strength=reg, loss='softmax')
+        model.fit(X_train, y_train, epochs=20, batch_size=batch_size,
+                  learning_rate=lr, optimizer=optimizer)
+
+        preds = model.predict(X_val)
+        acc = np.mean(preds == y_val)
+
+        print(f"trial {trial}: lr={lr:.5f}, reg={reg:.5f}, hidden={hidden_size}, "
+              f"batch={batch_size}, opt={optimizer} -> val_acc={acc:.4f}")
+
+        if acc > best_acc:
+            best_acc = acc
+            best_params = dict(lr=lr, reg=reg, hidden_size=hidden_size,
+                                batch_size=batch_size, optimizer=optimizer)
+            best_model = model
+
+    return best_model, best_params, best_acc
 
 trainDataset = BloodMNIST(split="train", download=True,size=28)
 valDataset = BloodMNIST(split="val", download=True,size=28)
 testDataset = BloodMNIST(split="test", download=True,size=28)
 
-trainImages,trainLabels,trainInfo = trainDataset.__dict__['imgs'],trainDataset.__dict__['labels'],trainDataset.__dict__['info']['label']
-
+trainImages = trainDataset.imgs
+trainLabels = trainDataset.labels
+trainInfo = trainDataset.info.get('label')
 
 print('Training data:')
 print(f'Images: {trainImages.shape}, Labels: {trainLabels.shape}')
 
-valImages,valLabels = valDataset.__dict__['imgs'],valDataset.__dict__['labels']
+valImages = valDataset.imgs
+valLabels = valDataset.labels
 print('Validation data:')
 print(f'Images: {valImages.shape}, Labels: {valLabels.shape}')
 
-testImages,testLabels = testDataset.__dict__['imgs'],testDataset.__dict__['labels']
+testImages = testDataset.imgs
+testLabels = testDataset.labels
 print('Test data:')
 print(f'Images: {testImages.shape}, Labels: {testLabels.shape}')
 
@@ -67,20 +103,27 @@ randomizeVal = np.arange(valImages.shape[0])
 X_val = valImages[randomizeVal]
 y_val = valLabels[randomizeVal].flatten()
 
+randomizeTest = np.arange(testImages.shape[0])
+X_test = testImages[randomizeTest]
+y_test = testLabels[randomizeTest].flatten()
 
 # Subsample the data for more efficient code execution in this exercise
-num_training = 5000
+num_training = 5950
 mask = list(range(num_training))
-
 X_train = X_train[mask]
 y_train = y_train[mask]
 
 print('first 10 examples in train: ',y_train[:10])
 
-num_val = 500
+num_val = 850
 mask = list(range(num_val))
 X_val = X_val[mask]
 y_val = y_val[mask]
+
+num_test = 1700
+mask = list(range(num_test))
+X_test = X_test[mask]
+y_test = y_test[mask]
 
 print('first 10 examples in val: ',y_val[:10])
 
@@ -88,6 +131,7 @@ print('first 10 examples in val: ',y_val[:10])
 #(vi tager billedet med dimensioner 28x28x3 og strækker det ud til en vektor med længden 28*28*3 = 2352)
 X_train = np.reshape(X_train, (X_train.shape[0], -1))
 X_val = np.reshape(X_val, (X_val.shape[0], -1))
+X_test = np.reshape(X_test, (X_test.shape[0], -1))
 print(f'New train shape: {X_train.shape}')
 print(f'New val shape: {X_val.shape}')
 
@@ -102,34 +146,31 @@ plt.show()
 # second: subtract the mean image from train and test data
 X_train = X_train.astype(np.float32)-mean_image
 X_val = X_val.astype(np.float32)-mean_image
+X_test = X_test.astype(np.float32)-mean_image
 
 print(X_train.min(),X_train.max())
 
-# third: append the bias dimension of ones (i.e. bias trick) so that our SVM
-# only has to worry about optimizing a single weight matrix W.
-X_train = np.hstack([X_train, np.ones((X_train.shape[0], 1))])
-X_val = np.hstack([X_val, np.ones((X_val.shape[0], 1))])
-
 print(X_train.shape, X_val.shape)
 
-image_size = 28*28*3+1
-num_classes = 8
+X_train /= float(255)
+X_val /= float(255)
 
-W = np.random.randn(image_size, num_classes) * 0.0001
+#nn = FullyConnectedNN(layers=[X_train.shape[1], 500, 8], loss='softmax')
+#nn.fit(X_train, y_train,learning_rate=0.01, epochs=200,optimizer='sgd')
 
-print(dl.svm_loss(W, X_train, y_train, 1)[1][0])
+#preds = nn.predict(X_train)
+#print(f'Training accuracy={np.mean(preds==y_train)}')
 
-classifier = LinearClassifier(input_dim=28*28*3+1,num_classes=8, loss_type=Loss_type.SOFT_MAX)
 
-history = classifier.train(X=X_train, y=y_train, num_iters=5000)
+#val_preds = nn.predict(X_val)
+#print(f'Validation accuracy={np.mean(val_preds==y_val)}')
 
-plt.plot(history)
+# Finding the best params
+best_model, best_params, best_acc = random_search(X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, num_trials=20)
 
-    #make predictions on the validation data
-predictions = classifier.predict(X=X_val)
+print(f"Best validation accuracy during optimization {best_acc}")
+test_preds_after_optimization = best_model.predict(X_test)
+print(f"Test Accuracy after random optimization{np.mean(test_preds_after_optimization==y_test)}")
 
-    #calculate the accuracy
-
-num_correct = sum(predictions == y_val)
-
-print((num_correct/num_val)*100)
+for k,v in best_params.items():
+    print(k, v)
