@@ -44,7 +44,6 @@ def softmax_loss(W, X, y, reg=0.0) -> tuple[float, np.ndarray]:
   rows = np.arange(N)
   scores = X @ W
   scores_shifted = scores - np.max(scores) # for safety, for not reaching a bit overflow
-  correct = scores[rows, y][:, None]
 
   exp_scores = np.exp(scores_shifted)
   probs = exp_scores / np.sum(exp_scores)

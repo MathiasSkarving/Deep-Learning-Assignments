@@ -4,18 +4,21 @@ from cmath import sqrt
 import math
 import matplotlib.pyplot as plt
 import numpy as np
+from linearclassifier import Loss_type
 from functools import partial
 
 from medmnist import BloodMNIST
 
-import data_loss
+import data_loss as dl
 from knn import KNearestNeighbor
+from linearclassifier import LinearClassifier
 
 trainDataset = BloodMNIST(split="train", download=True,size=28)
 valDataset = BloodMNIST(split="val", download=True,size=28)
 testDataset = BloodMNIST(split="test", download=True,size=28)
 
 trainImages,trainLabels,trainInfo = trainDataset.__dict__['imgs'],trainDataset.__dict__['labels'],trainDataset.__dict__['info']['label']
+
 
 print('Training data:')
 print(f'Images: {trainImages.shape}, Labels: {trainLabels.shape}')
@@ -114,4 +117,19 @@ num_classes = 8
 
 W = np.random.randn(image_size, num_classes) * 0.0001
 
-print(svm_loss.svm_loss(W, X_train, y_train, 1000)[1][0])
+print(dl.svm_loss(W, X_train, y_train, 1)[1][0])
+
+classifier = LinearClassifier(input_dim=28*28*3+1,num_classes=8, loss_type=Loss_type.SOFT_MAX)
+
+history = classifier.train(X=X_train, y=y_train, num_iters=5000)
+
+plt.plot(history)
+
+    #make predictions on the validation data
+predictions = classifier.predict(X=X_val)
+
+    #calculate the accuracy
+
+num_correct = sum(predictions == y_val)
+
+print((num_correct/num_val)*100)
